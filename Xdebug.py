@@ -5,7 +5,6 @@ import socket
 import base64
 import threading
 import types
-import json
 import webbrowser
 from xml.dom.minidom import parseString
 
