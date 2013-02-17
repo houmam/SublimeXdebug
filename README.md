@@ -48,19 +48,40 @@ XDebug actions:
 ## Session based debugging
 
 This plugin can initiate and terminate a debugging session by launching your default web browser with the XDEBUG_SESSION_START or XDEBUG_SESSION_STOP parameters. The debug URL is defined in your .sublime-project file like this:
-	
-	{
-		"folders":
-		[
-			{
-				"path": "..."
-			},
-		],
 
-		"settings": {
-			"xdebug": { "url": "http://your.web.server" }
-		}
-	}
+    {
+        "folders":
+        [
+            {
+                "path": "..."
+            },
+        ],
+
+        "settings": {
+            "xdebug": {
+
+                "sites": {
+                    "<development_site>":
+                    {
+                        "url": "<development_url>",
+                        "map":
+                        {
+                            "<local_path>" : "<remote_path>"
+                        }
+                    },
+
+                    "<production_site>":
+                    {
+                        "url": "<production_url>",
+                        "map":
+                        {
+                            "<local_path>"  : "<remote_path>"
+                        }
+                    }
+                }
+            }
+        }
+    }
 
 If you don't configure the URL, the plugin will still listen for debugging connections from XDebug, but you will need to trigger XDebug <a href="http://XDebug.org/docs/remote">for a remote session</a>. The IDE Key should be "sublime.xdebug".
 
@@ -72,7 +93,7 @@ You can change the color of the gutter icons by adding the following scopes to y
 
 Of course, SublimeXDebug won't do anything if you don't install and configure XDebug first.
 
-	<a href="http://xdebug.org/docs/install">Installation instructions</a>
+    <a href="http://xdebug.org/docs/install">Installation instructions</a>
 
 Here's how I setup XDebug on Ubuntu 12.04:
 
@@ -90,8 +111,8 @@ The debugger assumes XDebug is configured to connect on port 9000.
 
 Fixing pyexpat module errors. In Ubuntu you might need to do the following because Ubuntu stopped shipping Python 2.6 libraries a long time ago:
 
-	$ sudo apt-get install python2.6
-	$ ln -s /usr/lib/python2.6 [Sublime Text dir]/lib/
+    $ sudo apt-get install python2.6
+    $ ln -s /usr/lib/python2.6 [Sublime Text dir]/lib/
 
 On Ubuntu 12.04, Python 2.6 isn't available, so here's what worked for me:
 
