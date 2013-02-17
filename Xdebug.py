@@ -385,19 +385,17 @@ class XdebugCommand(sublime_plugin.TextCommand):
     The Xdebug main quick panel menu
     '''
     def run(self, edit):
+
         mapping = {
             'xdebug_breakpoint': 'Add/Remove Breakpoint',
             'xdebug_clear_all_breakpoints': 'Clear all Breakpoints',
         }
 
-        sites = get_project_setting('sites')
-
         if protocol:
-            mapping['xdebug_clear'] = 'Stop debugging'
+            global debug_site
+            mapping['xdebug_clear'] = 'Stop debugging ' + debug_site
         else:
-            for k, v in sites.items():
-                mapping['xdebug_listen_' + k] = 'Start debugging ' + k
-                pass
+            mapping['xdebug_list_sites'] = 'Start debugging'
 
         if protocol and protocol.connected:
             mapping.update({
@@ -415,6 +413,19 @@ class XdebugCommand(sublime_plugin.TextCommand):
 
         global debug_site
         command = self.cmds[index]
+
+        if command.startswith('xdebug_list_sites'):
+            sites = get_project_setting('sites')
+
+            mapping = {}
+
+            for k, v in sites.items():
+                mapping['xdebug_listen_' + k] = k
+                pass
+
+            self.cmds = sorted(mapping.keys())
+            self.items = mapping.values()
+            self.view.window().show_quick_panel(self.items, self.callback)
 
         if command.startswith('xdebug_listen_'):
             self.view.run_command('xdebug_listen')
