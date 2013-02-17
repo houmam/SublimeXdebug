@@ -5,19 +5,18 @@ import socket
 import base64
 import threading
 import types
-import json
 import webbrowser
 from xml.dom.minidom import parseString
-
 
 xdebug_current = None
 original_layout = None
 debug_view = None
 protocol = None
 buffers = {}
-breakpoint_icon = '../Xdebug/icons/breakpoint'
-current_icon = '../Xdebug/icons/current'
-current_breakpoint_icon = '../Xdebug/icons/current_breakpoint'
+debug_site = None
+breakpoint_icon = '../SublimeXdebug/icons/breakpoint'
+current_icon = '../SublimeXdebug/icons/current'
+current_breakpoint_icon = '../SublimeXdebug/icons/current_breakpoint'
 
 
 class DebuggerException(Exception):
@@ -39,6 +38,7 @@ class Protocol(object):
 
     read_rate = 1024
     port = 9000
+    verbose = False
 
     def __init__(self):
         self.port = get_project_setting('port') or get_setting('port') or self.port
@@ -93,7 +93,11 @@ class Protocol(object):
 
     def read(self):
         data = self.read_data()
-        #print '<---', data
+
+        if self.verbose:
+            print '\n<--- Read'
+            print data
+
         document = parseString(data)
         return document
 
@@ -118,7 +122,11 @@ class Protocol(object):
 
         try:
             self.sock.send(command + '\x00')
-            #print '--->', command
+
+            if self.verbose:
+                print '\n---> Sent'
+                print command
+
         except Exception, x:
             raise(ProtocolConnectionException, x)
 
@@ -219,7 +227,16 @@ class XdebugView(object):
             self.del_breakpoint(row)
 
     def uri(self):
-        return 'file://' + os.path.realpath(self.view.file_name())
+        global debug_site
+
+        sites = get_project_setting('sites')
+
+        local_path = os.path.realpath(self.view.file_name())
+
+        for k, v in sites[debug_site]['map'].items():
+            remote_path = local_path.replace(k, v)
+
+        return 'file://' + remote_path
 
     def lines(self, data=None):
         lines = []
@@ -373,10 +390,14 @@ class XdebugCommand(sublime_plugin.TextCommand):
             'xdebug_clear_all_breakpoints': 'Clear all Breakpoints',
         }
 
+        sites = get_project_setting('sites')
+
         if protocol:
             mapping['xdebug_clear'] = 'Stop debugging'
         else:
-            mapping['xdebug_listen'] = 'Start debugging'
+            for k, v in sites.items():
+                mapping['xdebug_listen_' + k] = 'Start debugging ' + k
+                pass
 
         if protocol and protocol.connected:
             mapping.update({
@@ -392,13 +413,24 @@ class XdebugCommand(sublime_plugin.TextCommand):
         if index == -1:
             return
 
+        global debug_site
         command = self.cmds[index]
-        self.view.run_command(command)
 
-        if protocol and command == 'xdebug_listen':
-            url = get_project_setting('url')
+        if command.startswith('xdebug_listen_'):
+            self.view.run_command('xdebug_listen')
+        else:
+            self.view.run_command(command)
+
+        if protocol and command.startswith('xdebug_listen_'):
+
+            sites = get_project_setting('sites')
+            site = command.replace('xdebug_listen_', '')
+
+            url = sites[site]["url"]
+
             if url:
                 webbrowser.open(url + '?XDEBUG_SESSION_START=sublime.xdebug')
+                debug_site = site
             else:
                 sublime.status_message('Xdebug: No URL defined in project settings file.')
 
@@ -413,12 +445,15 @@ class XdebugCommand(sublime_plugin.TextCommand):
                 "cells": [[0, 0, 2, 1], [0, 1, 1, 2], [1, 1, 2, 2]]
             })
 
-        if command == 'xdebug_clear':
-            url = get_project_setting('url')
-            if url:
+        elif command == 'xdebug_clear':
+
+            if debug_site:
+                sites = get_project_setting('sites')
+                url = sites[debug_site]["url"]
                 webbrowser.open(url + '?XDEBUG_SESSION_STOP=sublime.xdebug')
             else:
                 sublime.status_message('Xdebug: No URL defined in project settings file.')
+
             window = sublime.active_window()
             window.run_command('hide_panel', {"panel": 'output.xdebug_inspect'})
             window.set_layout(original_layout)
@@ -459,9 +494,18 @@ class XdebugContinueCommand(sublime_plugin.TextCommand):
 
         for child in res.childNodes:
             if child.nodeName == 'xdebug:message':
-                #print '>>>break ' + child.getAttribute('filename') + ':' + child.getAttribute('lineno')
+                # print '>>>break ' + child.getAttribute('filename') + ':' + child.getAttribute('lineno')
+                global debug_site
+
+                sites = get_project_setting('sites')
+
+                remote_path = child.getAttribute('filename')
+
+                for k, v in sites[debug_site]['map'].items():
+                    local_path = remote_path.replace(v, k)
+
                 sublime.status_message('Xdebug: breakpoint')
-                xdebug_current = show_file(self.view.window(), child.getAttribute('filename'))
+                xdebug_current = show_file(self.view.window(), local_path)
                 xdebug_current.current(int(child.getAttribute('lineno')))
 
         if (res.getAttribute('status') == 'break'):
